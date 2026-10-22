@@ -29,8 +29,14 @@ public static class LinuxCommandCatalog
         new("text", "Text commands", "grep, head, tail and wc for files and pipes, for example: dir | grep -i log.",
             ["grep", "head", "tail", "wc"]),
         new("system", "System commands", "ps, kill, killall, uname, df, free, uptime, ifconfig, which, clear, env, export, history and sleep.",
-            ["ps", "kill", "killall", "uname", "df", "free", "uptime", "ifconfig", "which", "clear", "env", "export", "history", "sleep"])
+            ["ps", "kill", "killall", "uname", "df", "free", "uptime", "ifconfig", "which", "clear", "env", "export", "history", "sleep"]),
+        new(WslPackage.ComponentId, "Real Linux (WSL2 + Alpine)", "Windows Subsystem for Linux with Alpine Linux. linux opens a Linux shell; linux COMMAND runs any Linux program; apk installs more.",
+            ["linux", "apk", "sh", "sed", "awk", "vi", "gzip", "gunzip", "xargs", "cut", "tr", "uniq", "diff", "less", "du", "wget"])
     ];
+
+    private const string LinuxRegistered =
+        "reg query \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\" /s /f " + WslPackage.Distribution + " /d /e >nul 2>&1";
+    private const string FindWsl = "set \"WSL=%ProgramFiles%\\WSL\\wsl.exe\"\r\nif not exist \"%WSL%\" set \"WSL=wsl.exe\"";
 
     // Commands that need no PowerShell; they run directly in the calling Command Prompt.
     private static readonly IReadOnlyDictionary<string, string> BatchCommands = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -59,8 +65,40 @@ public static class LinuxCommandCatalog
             "setlocal",
             "if \"%~1\"==\"\" (echo usage: sudo COMMAND [ARGUMENTS] 1>&2& exit /b 1)",
             "set \"TINY11_SUDO=%*\"",
-            Script("sudo", forward: false))
+            Script("sudo", forward: false)),
+        // Runs in Alpine under WSL. The first use imports Alpine for the current user if first sign-in did not.
+        ["linux"] = string.Join("\r\n",
+            "@echo off",
+            "setlocal",
+            LinuxRegistered + " || call \"%~dp0" + WslPackage.SetupScript + "\" || exit /b 1",
+            FindWsl,
+            "if \"%~1\"==\"\" (\"%WSL%\" -d " + WslPackage.Distribution + " & exit /b)",
+            "\"%WSL%\" -d " + WslPackage.Distribution + " -- %*")
     };
+
+    /// <summary>Installs WSL from the bundled MSI when needed and imports Alpine for the current user.</summary>
+    public static string WslSetupScript() => string.Join("\r\n",
+        "@echo off",
+        "setlocal",
+        "set \"PKG=%~dp0" + WslPackage.Directory + "\\\"",
+        "if exist \"%ProgramFiles%\\WSL\\wsl.exe\" goto import",
+        "echo Installing Windows Subsystem for Linux " + WslPackage.WslVersion + "...",
+        "powershell.exe -NoLogo -NoProfile -Command \"$p = Start-Process msiexec.exe -Verb RunAs -Wait -PassThru -ArgumentList ('/i \\\"' + $env:PKG + '" + WslPackage.MsiName + "\\\" /qn /norestart'); exit $p.ExitCode\"",
+        "set \"rc=%errorlevel%\"",
+        "if not \"%rc%\"==\"0\" if not \"%rc%\"==\"3010\" (echo WSL could not be installed, error %rc%. 1>&2& exit /b 1)",
+        ":import",
+        FindWsl,
+        LinuxRegistered + " && exit /b 0",
+        "echo Setting up Alpine Linux " + WslPackage.AlpineVersion + "...",
+        "set \"TARGET=%LOCALAPPDATA%\\Tiny11Linux\\" + WslPackage.Distribution + "\"",
+        "\"%WSL%\" --import " + WslPackage.Distribution + " \"%TARGET%\" \"%PKG%" + WslPackage.RootfsName + "\" --version 2 || " +
+            "\"%WSL%\" --import " + WslPackage.Distribution + " \"%TARGET%\" \"%PKG%" + WslPackage.RootfsName + "\" --version 1 || " +
+            "(echo Alpine Linux could not be set up. Turn on virtualization in the firmware or VM settings, then run " + WslPackage.SetupScript + " again. 1>&2& exit /b 1)",
+        "\"%WSL%\" --set-default " + WslPackage.Distribution + " >nul",
+        "echo Alpine Linux is ready. Type linux to open it.");
+
+    private static readonly HashSet<string> WslCommands =
+        new(Components.Single(c => c.Id == WslPackage.ComponentId).Commands.Where(c => c != "linux"), StringComparer.Ordinal);
 
     public static IEnumerable<string> CommandsFor(IEnumerable<string> ids) =>
         Components.Where(component => ids.Contains(component.Id, StringComparer.Ordinal)).SelectMany(component => component.Commands);
@@ -71,9 +109,17 @@ public static class LinuxCommandCatalog
     public static IReadOnlyDictionary<string, string> Files(IEnumerable<string> ids)
     {
         var files = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var command in CommandsFor(ids))
-            files[command + ".cmd"] = Crlf(BatchCommands.TryGetValue(command, out var body) ? body : Script(command, forward: true));
-        if (files.Count > 0) files[ScriptName] = Crlf(DispatcherScript());
+        var selected = ids.ToArray();
+        var usesScript = false;
+        foreach (var command in CommandsFor(selected))
+        {
+            if (BatchCommands.TryGetValue(command, out var body)) files[command + ".cmd"] = Crlf(body);
+            else if (selected.Contains(WslPackage.ComponentId, StringComparer.Ordinal) && WslCommands.Contains(command))
+                files[command + ".cmd"] = Crlf($"@call \"%~dp0linux.cmd\" {command} %*");
+            else { files[command + ".cmd"] = Crlf(Script(command, forward: true)); usesScript = true; }
+        }
+        if (usesScript || files.ContainsKey("sudo.cmd")) files[ScriptName] = Crlf(DispatcherScript());
+        if (selected.Contains(WslPackage.ComponentId, StringComparer.Ordinal)) files[WslPackage.SetupScript] = Crlf(WslSetupScript());
         return files;
     }
 

@@ -124,6 +124,7 @@ public sealed partial class BuildEngine
         PathSafety.Validate(recipe);
         if (string.IsNullOrEmpty(recipe.OscdimgPath)) throw new FileNotFoundException("Windows ADK oscdimg.exe is required to create a bootable ISO.");
         host.ValidateTools(recipe);
+        if (recipe.LinuxComponents.Contains(WslPackage.ComponentId)) WslPackage.RequireFiles(recipe.WslPackagePath);
         using var media = mediaFactory.Open(recipe.SourcePath);
         var sourceWim = InstallationMedia.ImageFile(media.RootPath);
         var workingCompression = InstallationMedia.WorkingCompression(sourceWim);
@@ -179,6 +180,7 @@ public sealed partial class BuildEngine
                 ("Custom servicing", "Apply individual servicing actions"), ("Remove apps", "Remove selected apps"),
                 ("Optional features", "Remove optional features and capabilities"),
                 ("Component cleanup", "Clean superseded component files"), (".NET 3.5", "Include .NET Framework 3.5"),
+                ("WSL", "Add WSL2 and Alpine Linux"),
                 ("Windows settings", "Apply Windows settings"), ("Linux commands", "Add Linux commands for Command Prompt"),
                 ("Advanced payloads", "Remove selected payload files"),
                 ("Core pruning", "Trim Core component payloads"), ("Redundant data", "Remove redundant offline data"),
@@ -190,6 +192,7 @@ public sealed partial class BuildEngine
                 "Inventory" => recipe.ExpertActions.Length > 0,
                 "Custom servicing" => servicingActions.Length > 0,
                 ".NET 3.5" => recipe.EnableNetFx3,
+                "WSL" => recipe.LinuxComponents.Contains(WslPackage.ComponentId),
                 "Linux commands" => recipe.LinuxComponents.Length > 0,
                 "Component cleanup" => recipe.SelectedOptions.Contains("cleanup") || recipe.Flavor == BuildFlavor.Core,
                 "Core pruning" => recipe.Flavor == BuildFlavor.Core,
@@ -382,6 +385,19 @@ public sealed partial class BuildEngine
                 if (!Directory.Exists(sxs)) throw new DirectoryNotFoundException("The source has no sources\\sxs payload for .NET 3.5.");
                 await dism.RunAsync(token, $"/Image:{mount}", "/Enable-Feature", "/FeatureName:NetFx3", "/All",
                     "/LimitAccess", $"/Source:{sxs}", "/NoRestart").ConfigureAwait(false);
+            }
+            if (recipe.LinuxComponents.Contains(WslPackage.ComponentId))
+            {
+                Stage("WSL", "Enabling WSL and Virtual Machine Platform and adding Alpine Linux.");
+                foreach (var feature in WslPackage.Features)
+                    await dism.RunAsync(token, $"/Image:{mount}", "/Enable-Feature", $"/FeatureName:{feature}", "/All",
+                        "/LimitAccess", "/NoRestart").ConfigureAwait(false);
+                await tracking.RunAsync("linux:wsl", "WSL", "Copy WSL and Alpine Linux into the image",
+                    () =>
+                    {
+                        WslPackage.Install(mount, recipe.WslPackagePath, Log);
+                        return Task.CompletedTask;
+                    }).ConfigureAwait(false);
             }
             Stage("Windows settings", "Applying selected registry settings to the offline image.");
             await tracking.RunAsync("registry:settings", "Windows settings", "Apply and verify offline Windows settings",

@@ -27,7 +27,7 @@ public sealed class LinuxCommandTests
         Assert.Equal(all.Length, all.Distinct(StringComparer.OrdinalIgnoreCase).Count());
         var files = LinuxCommandCatalog.Files(LinuxCommandCatalog.Components.Select(c => c.Id));
         var script = files[LinuxCommandCatalog.ScriptName];
-        foreach (var command in all.Where(command => files[command + ".cmd"].Contains($"\" {command} %*")))
+        foreach (var command in all.Where(command => files[command + ".cmd"].Contains(LinuxCommandCatalog.ScriptName)))
             Assert.Contains($"'{command}' {{", script);
     }
 

@@ -58,6 +58,8 @@ public sealed record BuildRecipe
     public string OutputPath { get; init; } = "";
     public string DismPath { get; init; } = "";
     public string OscdimgPath { get; init; } = "";
+    /// <summary>Directory with the downloaded WSL MSI and Alpine rootfs; used when <see cref="LinuxComponents"/> has "wsl".</summary>
+    public string WslPackagePath { get; init; } = "";
     public Compression Compression { get; init; } = Compression.Recovery;
     public BuildFlavor Flavor { get; init; }
     public BuildMode? Mode { get; init; }
@@ -102,6 +104,8 @@ public sealed record BuildRecipe
         foreach (var id in LinuxComponents)
             if (!LinuxCommandCatalog.IsKnown(id))
                 throw new InvalidDataException($"Unknown Linux command choice: {id}");
+        if (Flavor == BuildFlavor.Core && LinuxComponents.Contains(WslPackage.ComponentId))
+            throw new InvalidDataException("WSL with Alpine needs a serviceable image. Tiny11 Core removes the components it depends on.");
         if (Mode is BuildMode.Tiny11 or BuildMode.Tiny11Core &&
             (Flavor != (Mode == BuildMode.Tiny11Core ? BuildFlavor.Core : BuildFlavor.Regular) ||
              ExpertActions.Length > 0 ||

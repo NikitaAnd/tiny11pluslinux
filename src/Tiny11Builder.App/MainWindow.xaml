@@ -397,6 +397,7 @@
                                         <CheckBox x:Name="LinuxFilesCheck" Content="File commands — ls, cat, cp, mv, rm, touch, ln, pwd" AutomationProperties.Name="Linux file commands"/>
                                         <CheckBox x:Name="LinuxTextCheck" Content="Text commands — grep, head, tail, wc" AutomationProperties.Name="Linux text commands"/>
                                         <CheckBox x:Name="LinuxSystemCheck" Content="System commands — ps, kill, uname, df, free, uptime, which, clear and more" AutomationProperties.Name="Linux system commands"/>
+                                        <CheckBox x:Name="LinuxWslCheck" Content="Real Linux — WSL2 + Alpine: linux, apk, sed, awk, vi and any Linux program (downloads about 370 MB; not for Tiny11 Core)" AutomationProperties.Name="Real Linux with WSL2 and Alpine"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>

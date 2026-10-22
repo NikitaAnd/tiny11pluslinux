@@ -15,6 +15,13 @@ public static class UnattendBuilder
         var oobe = new XElement(ns + "OOBE",
             new XElement(ns + "HideOEMRegistrationScreen", true));
         if (recipe.PreferLocalAccount) oobe.Add(new XElement(ns + "HideOnlineAccountScreens", true));
+        var shell = new List<object>();
+        if (recipe.LinuxComponents.Contains(WslPackage.ComponentId))
+            shell.Add(new XElement(ns + "FirstLogonCommands", new XElement(ns + "SynchronousCommand",
+                new XAttribute(wcm + "action", "add"), new XElement(ns + "Order", 1),
+                new XElement(ns + "CommandLine", $@"cmd.exe /c ""%SystemRoot%\{LinuxCommandCatalog.DirectoryName}\{WslPackage.SetupScript}"""),
+                new XElement(ns + "Description", "Set up WSL and Alpine Linux"))));
+        shell.Add(oobe);
         return new XDocument(new XDeclaration("1.0", "utf-8", null),
             new XElement(ns + "unattend", new XAttribute(XNamespace.Xmlns + "wcm", wcm),
                 new XElement(ns + "settings", new XAttribute("pass", "windowsPE"),
@@ -27,6 +34,6 @@ public static class UnattendBuilder
                                 new XElement(ns + "Value", 1))))),
                         new XElement(ns + "DynamicUpdate", new XElement(ns + "Enable", false)))),
                 new XElement(ns + "settings", new XAttribute("pass", "oobeSystem"),
-                    Component("Microsoft-Windows-Shell-Setup", oobe)))).ToString();
+                    Component("Microsoft-Windows-Shell-Setup", shell.ToArray())))).ToString();
     }
 }

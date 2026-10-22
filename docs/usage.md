@@ -108,12 +108,37 @@ saved in recipes (`LinuxComponents`) and frozen on resume.
 | `files` | `ls`, `cat`, `cp`, `mv`, `rm`, `touch`, `ln`, `pwd` |
 | `text` | `grep`, `head`, `tail`, `wc` (files and pipes, e.g. `dir \| grep -i log`) |
 | `system` | `ps`, `kill`, `killall`, `uname`, `df`, `free`, `uptime`, `ifconfig`, `which`, `clear`, `env`, `export`, `history`, `sleep` |
+| `wsl` | Real Linux: WSL2 with Alpine Linux. `linux` opens an Alpine shell, `linux COMMAND` runs any Linux program, plus shortcuts `apk`, `sh`, `sed`, `awk`, `vi`, `gzip`, `gunzip`, `xargs`, `cut`, `tr`, `uniq`, `diff`, `less`, `du`, `wget`. See below. |
 
 These are Windows commands with Linux names and common options, not Linux
 binaries: `pwd`, `clear`, `which`, `env`, `export`, `history`, `ifconfig` and
 `cat` are batch files; the rest run through one bundled Windows PowerShell
 script (`tiny11linux.ps1`). Built-in `cmd` commands keep priority, so names
-such as `dir` are unchanged. Nothing is downloaded and WSL is not installed.
+such as `dir` are unchanged. Commands in `System32` (for example `find`,
+`sort`, `tar`, `curl`) also keep priority.
+
+### Real Linux: WSL2 + Alpine
+
+The `wsl` group embeds an actual Linux system:
+
+- Before servicing, the builder downloads the Windows Subsystem for Linux MSI
+  (WSL 3.0.3, from Microsoft's GitHub releases, about 370 MB) and the Alpine
+  Linux 3.24.3 minirootfs (about 4 MB) for the image architecture (x64 or
+  arm64). Both are pinned by SHA-256; nothing is kept or used if a checksum
+  differs. Downloads are cached under the app's `tools\wsl` folder.
+- The `Microsoft-Windows-Subsystem-Linux` and `VirtualMachinePlatform`
+  features are enabled offline with DISM, and both files are copied to
+  `%SystemRoot%\Tiny11Linux\wsl`.
+- At the first sign-in, `wsl-setup.cmd` installs WSL from the bundled MSI and
+  imports Alpine as the default distribution for that user
+  (`%LOCALAPPDATA%\Tiny11Linux\Alpine`). Other users get it the first time
+  they run `linux`. No internet connection is needed on the installed PC.
+- WSL2 needs hardware virtualization (in a VM: nested virtualization). If it is
+  unavailable, Alpine is imported as WSL1 instead.
+- Inside Alpine you are `root`; `sudo` there is Linux root, not Windows
+  administrator. Install more software with `apk add`, e.g. `apk add bash git`.
+- Not available with Tiny11 Core, which removes the servicing stack and
+  components WSL depends on.
 
 ## Turbo mode and smaller images
 

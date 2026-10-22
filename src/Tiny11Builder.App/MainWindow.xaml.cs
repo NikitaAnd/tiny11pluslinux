@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private int? pendingImageIndex;
     private string pendingSourcePath = "";
     private WindowsImage? image;
+    private string wslPackage = "";
     private int step;
     private int reached;
     private bool initialized;
@@ -318,13 +319,13 @@ public sealed partial class MainWindow : Window
     }
 
     private (string Id, CheckBox Box)[] LinuxChecks() =>
-        [("sudo", LinuxSudoCheck), ("files", LinuxFilesCheck), ("text", LinuxTextCheck), ("system", LinuxSystemCheck)];
+        [("sudo", LinuxSudoCheck), ("files", LinuxFilesCheck), ("text", LinuxTextCheck), ("system", LinuxSystemCheck), (WslPackage.ComponentId, LinuxWslCheck)];
 
     private BuildRecipe CreateRecipe() => new()
     {
         SourcePath = SourcePathBox.Text.Trim(), ImageIndex = image?.Index ?? 1,
         WorkspacePath = WorkspaceBox.Text.Trim(), OutputPath = OutputBox.Text.Trim(),
-        DismPath = servicingTool, OscdimgPath = isoTool,
+        DismPath = servicingTool, OscdimgPath = isoTool, WslPackagePath = wslPackage,
         Mode = SelectedMode, Flavor = UsesCore ? BuildFlavor.Core : BuildFlavor.Regular,
         CoreAcknowledged = coreAcknowledged, ExpertAcknowledged = ExpertConsent.IsChecked == true,
         SelectedOptions = options.Where(o => o.Selected).Select(o => o.Option.Id).ToArray(),
@@ -1037,6 +1038,14 @@ public sealed partial class MainWindow : Window
             BuildBar.IsIndeterminate = true;
             CurrentMessage.Text = "Preparing image tools…";
             await EnsureToolsAsync(token);
+            if (recipe.LinuxComponents.Contains(WslPackage.ComponentId))
+            {
+                CurrentMessage.Text = "Downloading WSL and Alpine Linux…";
+                using var client = OfficialImageDownloader.CreateClient();
+                client.Timeout = TimeSpan.FromMinutes(30);
+                wslPackage = await new WslAcquirer(client).EnsureAsync(Path.Combine(dataDirectory, "tools", "wsl"), image!.Architecture,
+                    new UiProgress<string>(text => DispatcherQueue.TryEnqueue(() => CurrentMessage.Text = text)), token);
+            }
             recipe = CreateRecipe();
             BeginBuildRun("Building");
             var reporter = BuildProgressReporter();
