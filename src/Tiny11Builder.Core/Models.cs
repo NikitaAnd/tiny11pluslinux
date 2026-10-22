@@ -72,6 +72,7 @@ public sealed record BuildRecipe
     public bool TurboMode { get; init; }
     public bool RemoveRedundantData { get; init; }
     public bool OmitNetFx3SetupPayload { get; init; }
+    public string[] LinuxComponents { get; init; } = [];
 
     public void ValidateOptions()
     {
@@ -96,6 +97,11 @@ public sealed record BuildRecipe
         foreach (var id in SelectedOptions)
             if (!CleanupCatalog.Options.Any(o => o.Id == id))
                 throw new InvalidDataException($"Unknown cleanup option: {id}");
+        if (LinuxComponents is null || LinuxComponents.Length != LinuxComponents.Distinct(StringComparer.Ordinal).Count())
+            throw new InvalidDataException("Invalid or duplicate Linux command choices.");
+        foreach (var id in LinuxComponents)
+            if (!LinuxCommandCatalog.IsKnown(id))
+                throw new InvalidDataException($"Unknown Linux command choice: {id}");
         if (Mode is BuildMode.Tiny11 or BuildMode.Tiny11Core &&
             (Flavor != (Mode == BuildMode.Tiny11Core ? BuildFlavor.Core : BuildFlavor.Regular) ||
              ExpertActions.Length > 0 ||

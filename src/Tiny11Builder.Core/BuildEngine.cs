@@ -179,7 +179,8 @@ public sealed partial class BuildEngine
                 ("Custom servicing", "Apply individual servicing actions"), ("Remove apps", "Remove selected apps"),
                 ("Optional features", "Remove optional features and capabilities"),
                 ("Component cleanup", "Clean superseded component files"), (".NET 3.5", "Include .NET Framework 3.5"),
-                ("Windows settings", "Apply Windows settings"), ("Advanced payloads", "Remove selected payload files"),
+                ("Windows settings", "Apply Windows settings"), ("Linux commands", "Add Linux commands for Command Prompt"),
+                ("Advanced payloads", "Remove selected payload files"),
                 ("Core pruning", "Trim Core component payloads"), ("Redundant data", "Remove redundant offline data"),
                 ("Commit", "Save image changes"),
                 ("Setup image", "Apply Windows Setup settings"), ("Compress", "Compress the final image"),
@@ -189,6 +190,7 @@ public sealed partial class BuildEngine
                 "Inventory" => recipe.ExpertActions.Length > 0,
                 "Custom servicing" => servicingActions.Length > 0,
                 ".NET 3.5" => recipe.EnableNetFx3,
+                "Linux commands" => recipe.LinuxComponents.Length > 0,
                 "Component cleanup" => recipe.SelectedOptions.Contains("cleanup") || recipe.Flavor == BuildFlavor.Core,
                 "Core pruning" => recipe.Flavor == BuildFlavor.Core,
                 "Redundant data" => recipe.RemoveRedundantData,
@@ -388,6 +390,16 @@ public sealed partial class BuildEngine
                     registry.Apply(mount, recipe, Log);
                     return Task.CompletedTask;
                 }).ConfigureAwait(false);
+            if (recipe.LinuxComponents.Length > 0)
+            {
+                Stage("Linux commands", "Adding Linux-style commands for Command Prompt.");
+                await tracking.RunAsync("linux:commands", "Linux commands", "Write Linux commands to " + LinuxCommandCatalog.PathEntry,
+                    () =>
+                    {
+                        LinuxCommandCatalog.Install(mount, recipe.LinuxComponents, Log);
+                        return Task.CompletedTask;
+                    }).ConfigureAwait(false);
+            }
             File.WriteAllText(Path.Combine(staging, "autounattend.xml"), UnattendBuilder.Create(image, recipe));
             Stage("Advanced payloads", "Applying original-builder and expert payload removals to the offline copy only.");
             if (RemovesComponentPayloads(recipe)) await EnsureNoPendingOperationsAsync(session, token).ConfigureAwait(false);

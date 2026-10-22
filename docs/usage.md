@@ -94,6 +94,27 @@ The six-step wizard provides:
   state, verified saved progress for **Resume build**, an output SHA-256, a JSON
   report, and separate interrupted-workspace discard/recovery.
 
+## Linux commands for Command Prompt
+
+The settings page has a **Linux commands for Command Prompt** card. Each
+selected group is written to `%SystemRoot%\Tiny11Linux` in the offline image,
+and that folder is appended to the system `PATH`, so the commands work in
+`cmd` (and PowerShell) right after installation. Off by default; the choice is
+saved in recipes (`LinuxComponents`) and frozen on resume.
+
+| Group | Commands |
+| --- | --- |
+| `sudo` | `sudo`. On Windows 11 24H2 and newer the built-in Sudo for Windows is enabled inline, so `sudo net session` runs elevated in the same window after a UAC prompt. Builds without it use a bundled `sudo` that opens an elevated Command Prompt in the current folder. |
+| `files` | `ls`, `cat`, `cp`, `mv`, `rm`, `touch`, `ln`, `pwd` |
+| `text` | `grep`, `head`, `tail`, `wc` (files and pipes, e.g. `dir \| grep -i log`) |
+| `system` | `ps`, `kill`, `killall`, `uname`, `df`, `free`, `uptime`, `ifconfig`, `which`, `clear`, `env`, `export`, `history`, `sleep` |
+
+These are Windows commands with Linux names and common options, not Linux
+binaries: `pwd`, `clear`, `which`, `env`, `export`, `history`, `ifconfig` and
+`cat` are batch files; the rest run through one bundled Windows PowerShell
+script (`tiny11linux.ps1`). Built-in `cmd` commands keep priority, so names
+such as `dir` are unchanged. Nothing is downloaded and WSL is not installed.
+
 ## Turbo mode and smaller images
 
 The settings page has independent **Turbo mode**, **Remove redundant image

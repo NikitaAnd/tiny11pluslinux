@@ -194,6 +194,7 @@ public sealed class ResumeRefusalTests
     [InlineData("RemoveRedundantData")]
     [InlineData("OmitNetFx3SetupPayload")]
     [InlineData("CompactInstallation")]
+    [InlineData("LinuxComponents")]
     public async Task Frozen_recipe_fields_cannot_change_on_resume(string field)
     {
         using var fixture = new BuildFixture();
@@ -210,6 +211,7 @@ public sealed class ResumeRefusalTests
             "ImageIndex" => original with { ImageIndex = 2 },
             "RemoveRedundantData" => original with { RemoveRedundantData = true },
             "OmitNetFx3SetupPayload" => original with { OmitNetFx3SetupPayload = true },
+            "LinuxComponents" => original with { LinuxComponents = ["sudo"] },
             _ => original with { CompactInstallation = !original.CompactInstallation }
         };
         var refused = await AssertRefusedAsync(fixture, job, "frozen", changed);

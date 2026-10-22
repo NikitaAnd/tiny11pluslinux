@@ -256,6 +256,7 @@ public sealed partial class BuildEngine
         OutputPath = "", DismPath = "", OscdimgPath = "", Compression = default, KeepWorkingFiles = false,
         SourcePath = NormalizePath(recipe.SourcePath), WorkspacePath = NormalizePath(recipe.WorkspacePath),
         SelectedOptions = [.. recipe.SelectedOptions.Order(StringComparer.Ordinal)],
+        LinuxComponents = [.. recipe.LinuxComponents.Order(StringComparer.Ordinal)],
         ExpertActions = [.. recipe.ExpertActions.OrderBy(action => action.Kind).ThenBy(action => action.Identity, StringComparer.Ordinal)
             .ThenBy(action => action.Mode)]
     };

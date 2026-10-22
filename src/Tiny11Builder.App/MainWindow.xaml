@@ -390,6 +390,17 @@
                                 </Grid>
                             </Border>
                             <Border Style="{StaticResource Card}">
+                                <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <FontIcon Glyph="&#xE756;" FontSize="36" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                    <StackPanel Grid.Column="1" Spacing="6"><TextBlock Text="Linux commands for Command Prompt" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Add Linux-style commands such as sudo, ls and grep to cmd. They are added to the system PATH of the installed Windows." Style="{StaticResource Secondary}"/>
+                                        <CheckBox x:Name="LinuxSudoCheck" Content="sudo — run a command as administrator" AutomationProperties.Name="Linux command sudo"/>
+                                        <CheckBox x:Name="LinuxFilesCheck" Content="File commands — ls, cat, cp, mv, rm, touch, ln, pwd" AutomationProperties.Name="Linux file commands"/>
+                                        <CheckBox x:Name="LinuxTextCheck" Content="Text commands — grep, head, tail, wc" AutomationProperties.Name="Linux text commands"/>
+                                        <CheckBox x:Name="LinuxSystemCheck" Content="System commands — ps, kill, uname, df, free, uptime, which, clear and more" AutomationProperties.Name="Linux system commands"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource Card}">
                                 <Grid ColumnSpacing="20"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <FontIcon Glyph="&#xE8B7;" FontSize="36" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
                                     <StackPanel Grid.Column="1" Spacing="6"><TextBlock Text="Keep working files" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Retain the modified installation media after the ISO is saved. Uses more disk space." Style="{StaticResource Secondary}"/></StackPanel>
