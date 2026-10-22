@@ -41,7 +41,7 @@ public sealed class NativeTests(Xunit.Abstractions.ITestOutputHelper output)
         new OfflineRegistry().Apply(mount, new BuildRecipe
         {
             Flavor = BuildFlavor.Core, CoreAcknowledged = true, SelectedOptions = ["ads", "privacy", "hardware-bypass"],
-            PreferLocalAccount = true
+            PreferLocalAccount = true, LinuxComponents = ["sudo", "files"]
         }, output.WriteLine);
         new ImageOperations().ApplyNativeActions(mount,
             [new(ImageItemKind.Service, "wuauserv", ExpertActionMode.Remove)], output.WriteLine);
@@ -51,10 +51,17 @@ public sealed class NativeTests(Xunit.Abstractions.ITestOutputHelper output)
             Assert.DoesNotContain("wuauserv", services!.GetSubKeyNames());
             using var defender = services.OpenSubKey("WinDefend");
             Assert.Equal(4, defender!.GetValue("Start"));
+            using var environment = hive.Root.OpenSubKey(@"ControlSet001\Control\Session Manager\Environment");
+            Assert.Equal(RegistryValueKind.ExpandString, environment!.GetValueKind("Path"));
+            Assert.Equal(@"%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\Tiny11Linux",
+                environment.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames));
         }
         using (var hive = OfflineRegistry.Load(Path.Combine(mount, @"Windows\System32\config\SOFTWARE"), false))
         using (var key = hive.Root.OpenSubKey(@"Policies\Microsoft\Windows\DataCollection"))
             Assert.Equal(1, key!.GetValue("AllowTelemetry"));
+        using (var hive = OfflineRegistry.Load(Path.Combine(mount, @"Windows\System32\config\SOFTWARE"), false))
+        using (var key = hive.Root.OpenSubKey(LinuxCommandCatalog.SudoKey))
+            Assert.Equal(LinuxCommandCatalog.SudoInline, key!.GetValue(LinuxCommandCatalog.SudoValueName));
         Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(mount)!, "*.hive.json"));
         using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         Assert.DoesNotContain(machine.GetSubKeyNames(), key => key.StartsWith("Tiny11Builder_Offline_", StringComparison.Ordinal));
@@ -596,6 +603,8 @@ public sealed class NativeTests(Xunit.Abstractions.ITestOutputHelper output)
         {
             using var root = Registry.CurrentUser.CreateSubKey(name);
             using (var select = root.CreateSubKey("Select")) select.SetValue("Current", 1);
+            using (var environment = root.CreateSubKey(@"ControlSet001\Control\Session Manager\Environment"))
+                environment.SetValue("Path", @"%SystemRoot%\system32;%SystemRoot%", RegistryValueKind.ExpandString);
             foreach (var service in new[] { "wuauserv", "WinDefend" })
                 using (var key = root.CreateSubKey(@"ControlSet001\Services\" + service)) key.SetValue("Start", 2);
             using var privileges = new ImageOperations.PrivilegeScope("SeBackupPrivilege");

@@ -413,7 +413,7 @@ public sealed partial class BuildEngine
                 SchemaVersion = 1, CompletedUtc = DateTimeOffset.UtcNow, Image = s.Image, recipe.Flavor,
                 LegacyInstallerEnabled = SetupInstaller.RequiresLegacy(recipe),
                 recipe.SelectedOptions, recipe.ExpertActions, recipe.Compression, recipe.EnableNetFx3,
-                recipe.TurboMode, recipe.RemoveRedundantData, recipe.OmitNetFx3SetupPayload,
+                recipe.TurboMode, recipe.RemoveRedundantData, recipe.OmitNetFx3SetupPayload, recipe.LinuxComponents,
                 Execution = s.Execution, UsedOptimizedMount = s.UsedOptimizedMount, SetupMedia = s.StagingResult,
                 RedundantData = s.Cleanup, RemovedLogicalBytes = s.Cleanup.Sum(item => item.LogicalBytes),
                 OptionalFeatures = s.Features, Capabilities = s.Capabilities,

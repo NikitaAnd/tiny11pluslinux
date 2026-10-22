@@ -37,6 +37,10 @@ public sealed class OfflineRegistry : IOfflineRegistry
                     value.Key.Replace("{ControlSet}", controlSet, StringComparison.Ordinal), value.Name, value.Value, log);
         if (recipe.PreferLocalAccount)
             Set(software, @"Microsoft\Windows\CurrentVersion\OOBE", "BypassNRO", 1, log);
+        if (recipe.LinuxComponents.Contains("sudo"))
+            Set(software, LinuxCommandCatalog.SudoKey, LinuxCommandCatalog.SudoValueName, LinuxCommandCatalog.SudoInline, log);
+        if (recipe.LinuxComponents.Length > 0)
+            AddLinuxCommandPath(system, $@"{controlSet}\Control\Session Manager\Environment", log);
         if (recipe.Flavor == BuildFlavor.Core)
         {
             foreach (var control in system.GetSubKeyNames().Where(key =>
@@ -85,6 +89,24 @@ public sealed class OfflineRegistry : IOfflineRegistry
             throw new UnauthorizedAccessException($"Cannot write or verify offline registry value {root.Name}\\{path}\\{name}.", error);
         }
         log($"Policy written: {path}\\{name} = {value}");
+    }
+
+    private static void AddLinuxCommandPath(RegistryKey root, string path, Action<string> log)
+    {
+        using var key = OpenWriteKey(root, path);
+        var current = key.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string
+            ?? throw new InvalidDataException($"The offline image has no system PATH at {path}.");
+        var updated = LinuxCommandCatalog.AddToPath(current);
+        if (updated != current)
+        {
+            var bytes = System.Text.Encoding.Unicode.GetBytes(updated + "\0");
+            var code = RegSetValueEx(key.Handle, "Path", 0, 2, bytes, bytes.Length);
+            if (code != 0) throw new Win32Exception(code, $"Cannot set offline registry value {path}\\Path.");
+        }
+        if (key.GetValueKind("Path") != RegistryValueKind.ExpandString ||
+            !Equals(key.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames), updated))
+            throw new IOException($"Offline registry verification failed: {path}\\Path");
+        log($"System PATH includes {LinuxCommandCatalog.PathEntry}");
     }
 
     internal static OfflineHive Load(string path, bool writable = true) => new(path, writable);
