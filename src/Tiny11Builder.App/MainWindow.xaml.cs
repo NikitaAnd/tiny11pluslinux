@@ -26,6 +26,7 @@ public sealed partial class MainWindow : Window
     private int? pendingImageIndex;
     private string pendingSourcePath = "";
     private WindowsImage? image;
+    private string wslPackage = "";
     private int step;
     private int reached;
     private bool initialized;
@@ -317,11 +318,14 @@ public sealed partial class MainWindow : Window
         });
     }
 
+    private (string Id, CheckBox Box)[] LinuxChecks() =>
+        [("sudo", LinuxSudoCheck), ("files", LinuxFilesCheck), ("text", LinuxTextCheck), ("system", LinuxSystemCheck), (WslPackage.ComponentId, LinuxWslCheck)];
+
     private BuildRecipe CreateRecipe() => new()
     {
         SourcePath = SourcePathBox.Text.Trim(), ImageIndex = image?.Index ?? 1,
         WorkspacePath = WorkspaceBox.Text.Trim(), OutputPath = OutputBox.Text.Trim(),
-        DismPath = servicingTool, OscdimgPath = isoTool,
+        DismPath = servicingTool, OscdimgPath = isoTool, WslPackagePath = wslPackage,
         Mode = SelectedMode, Flavor = UsesCore ? BuildFlavor.Core : BuildFlavor.Regular,
         CoreAcknowledged = coreAcknowledged, ExpertAcknowledged = ExpertConsent.IsChecked == true,
         SelectedOptions = options.Where(o => o.Selected).Select(o => o.Option.Id).ToArray(),
@@ -330,7 +334,8 @@ public sealed partial class MainWindow : Window
         CompactInstallation = CompactCheck.IsOn, EnableNetFx3 = NetFxCheck.IsOn,
         PreferLocalAccount = LocalAccountCheck.IsOn, KeepWorkingFiles = KeepFilesCheck.IsOn,
         TurboMode = TurboCheck.IsOn, RemoveRedundantData = RedundantDataCheck.IsOn,
-        OmitNetFx3SetupPayload = OmitSetupCheck.IsOn
+        OmitNetFx3SetupPayload = OmitSetupCheck.IsOn,
+        LinuxComponents = LinuxChecks().Where(c => c.Box.IsChecked == true).Select(c => c.Id).ToArray()
     };
 
     private async Task RunOperation(OperationKind kind, Func<CancellationToken, Task> action)
@@ -978,6 +983,7 @@ public sealed partial class MainWindow : Window
         text.AppendLine($"COMPACT     {recipe.CompactInstallation}");
         text.AppendLine($".NET 3.5    {recipe.EnableNetFx3}");
         text.AppendLine($"LOCAL OOBE  {recipe.PreferLocalAccount} (best effort)");
+        text.AppendLine($"LINUX CMDS  {(recipe.LinuxComponents.Length > 0 ? string.Join(", ", recipe.LinuxComponents) : "None")}");
         if (SetupLabels.LegacyReason(recipe) is { } legacyReason) text.AppendLine($"LEGACY SETUP automatic, needed for {legacyReason}");
         text.AppendLine("\nREMOVE / DISABLE");
         foreach (var option in options.Where(o => o.Selected)) text.AppendLine($"  {option.Title}");
@@ -1005,7 +1011,8 @@ public sealed partial class MainWindow : Window
         ReviewOptions.Text = $"{compression} compression\nTurbo mode: {(recipe.TurboMode ? "On" : "Off")}\n" +
             $"Redundant data: {(recipe.RemoveRedundantData ? "Remove" : "Keep")}\n.NET setup payload: {(recipe.OmitNetFx3SetupPayload ? "Omit" : "Keep")}\n" +
             $"Compact installation: {(recipe.CompactInstallation ? "On" : "Off")}\n.NET 3.5: {(recipe.EnableNetFx3 ? "Included" : "Not included")}\n" +
-            $"Local-account setup: {(recipe.PreferLocalAccount ? "Preferred" : "Default")}\nWorking files: {(recipe.KeepWorkingFiles ? "Keep" : "Clean after build")}" +
+            $"Local-account setup: {(recipe.PreferLocalAccount ? "Preferred" : "Default")}\nWorking files: {(recipe.KeepWorkingFiles ? "Keep" : "Clean after build")}\n" +
+            $"Linux commands: {(recipe.LinuxComponents.Length > 0 ? string.Join(", ", recipe.LinuxComponents) : "None")}" +
             (SetupLabels.Legacy(recipe) is { } legacy ? "\n" + legacy : "");
     }
 
@@ -1031,6 +1038,14 @@ public sealed partial class MainWindow : Window
             BuildBar.IsIndeterminate = true;
             CurrentMessage.Text = "Preparing image tools…";
             await EnsureToolsAsync(token);
+            if (recipe.LinuxComponents.Contains(WslPackage.ComponentId))
+            {
+                CurrentMessage.Text = "Downloading WSL and Alpine Linux…";
+                using var client = OfficialImageDownloader.CreateClient();
+                client.Timeout = TimeSpan.FromMinutes(30);
+                wslPackage = await new WslAcquirer(client).EnsureAsync(Path.Combine(dataDirectory, "tools", "wsl"), image!.Architecture,
+                    new UiProgress<string>(text => DispatcherQueue.TryEnqueue(() => CurrentMessage.Text = text)), token);
+            }
             recipe = CreateRecipe();
             BeginBuildRun("Building");
             var reporter = BuildProgressReporter();
@@ -1470,6 +1485,7 @@ public sealed partial class MainWindow : Window
         TurboCheck.IsOn = recipe.TurboMode;
         RedundantDataCheck.IsOn = recipe.RemoveRedundantData;
         OmitSetupCheck.IsOn = recipe.OmitNetFx3SetupPayload;
+        foreach (var (id, box) in LinuxChecks()) box.IsChecked = recipe.LinuxComponents.Contains(id);
         pendingActions = recipe.ExpertActions;
         pendingImageIndex = recipe.ImageIndex;
         pendingSourcePath = recipe.SourcePath;
